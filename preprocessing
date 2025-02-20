@@ -1,0 +1,40 @@
+import pandas as pd
+from datetime import timedelta
+df_filtered = pd.read_csv("---")
+
+stop_reasons_to_exclude = [
+    'Filled in house',
+    'Replaced by new request',
+    'Request withdrawn by client'
+]
+
+# Filter out the unwanted stop reasons and select only 'Transferred' or 'Rejected' RESP_STATUS
+df_filtered = df_filtered[~df_filtered['REQU_STOPREASONNAME'].isin(stop_reasons_to_exclude)]
+filtered_file2 = df_filtered[df_filtered['RESP_STATUS'].isin(['Transferred', 'Rejected'])]
+
+
+filtered_file2['RESP_DEVIATION_STARTDATE'] = pd.to_datetime(filtered_file2['RESP_DEVIATION_STARTDATE'], errors='coerce')
+
+filtered_file2_sorted = filtered_file2.sort_values(by=['RESP_CANDIDATENAME', 'RESP_DEVIATION_STARTDATE'])
+
+mask = []
+
+for candidate_name, group in filtered_file2_sorted.groupby('RESP_CANDIDATENAME'):
+    group['RESP_DEVIATION_STARTDATE'] = pd.to_datetime(group['RESP_DEVIATION_STARTDATE'], errors='coerce')
+    group['Date_Difference'] = group['RESP_DEVIATION_STARTDATE'].diff().dt.days
+    group['keep_row'] = (group['Date_Difference'] > 60) | group['RESP_DEVIATION_STARTDATE'].isna()
+    group['keep_row'] = group['keep_row'] | (group['Date_Difference'].isna())
+
+    mask.append(group['keep_row'])
+
+final_mask = pd.concat(mask)
+
+
+filtered_file2_final = filtered_file2_sorted[final_mask]
+
+
+filtered_file2_final.reset_index(drop=True, inplace=True)
+
+print(filtered_file2_final)
+
+
