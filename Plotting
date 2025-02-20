@@ -1,0 +1,296 @@
+
+### calculating average responses per year 
+grouped_data = filtered_file2.groupby('REQU_YEAR').agg(
+    total_requests=('REQU_NUMBER', 'nunique'),  # Totaal aantal unieke aanvragen
+    total_responses=('RESP_DATE', 'count')  # Totaal aantal reacties
+).reset_index()
+
+grouped_data['avg_responses_per_request'] = grouped_data['total_responses'] / grouped_data['total_requests']
+
+
+
+average_2021_2023 = grouped_data[grouped_data['REQU_YEAR'].between(2020, 2023)]['avg_responses_per_request'].mean()
+
+
+average_2024 = grouped_data[grouped_data['REQU_YEAR'] == 2024]['avg_responses_per_request'].mean()
+
+print("Gemiddeld aantal reacties per aanvraag per jaar:")
+print(grouped_data[['REQU_YEAR', 'avg_responses_per_request']])
+
+print(f"\nGemiddeld aantal reacties per aanvraag (2020-2023): {average_2021_2023:.2f}")
+print(f"Gemiddeld aantal reacties per aanvraag (2024): {average_2024:.2f}")
+
+
+
+### plotting the request and responses over time
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+y['REQU_DATE'] = pd.to_datetime(y['REQU_DATE'], errors='coerce')
+y['RESP_DATE'] = pd.to_datetime(y['RESP_DATE'], errors='coerce')
+
+
+y['REQU_YEAR_MONTH'] = y['REQU_DATE'].dt.to_period('M')
+y['RESP_YEAR_MONTH'] = y['RESP_DATE'].dt.to_period('M')
+
+
+unique_requests_per_month = y.drop_duplicates(subset=['REQU_NUMBER']).groupby('REQU_YEAR_MONTH').size()
+
+responses_per_month = y.groupby('RESP_YEAR_MONTH').size()
+
+
+df_monthly_counts = pd.DataFrame({
+    'Unieke aanvragen': unique_requests_per_month,
+    'Reacties': responses_per_month
+}).fillna(0)  # Fill missing values with 0 for months with no responses or requests
+
+
+plt.figure(figsize=(12, 8))
+df_monthly_counts.plot(kind='line', marker='o', figsize=(18, 9))
+plt.title('Aantal unieke aanvragen en reacties per maand')
+plt.xlabel('Maand')
+plt.ylabel('Aantallen')
+plt.xticks(rotation=45)
+plt.grid(True)
+plt.tight_layout()
+plt.legend()
+
+output_path = "---"
+plt.savefig(output_path, dpi=300)
+
+plt.show()
+
+
+### plotting the response times 
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+x['REQU_DATE'] = pd.to_datetime(x['REQU_DATE'], errors='coerce')
+x['RESP_DATE'] = pd.to_datetime(x['RESP_DATE'], errors='coerce')
+
+x['RESPONSE_TIME'] = (x['RESP_DATE'] - x['REQU_DATE']).dt.days
+
+x = x[x['RESPONSE_TIME'].notnull()]
+
+x['REQU_YEAR'] = x['REQU_DATE'].dt.year
+x['REQU_YEAR_MONTH'] = x['REQU_DATE'].dt.to_period('M')
+
+avg_response_time_per_year = x.groupby('REQU_YEAR')['RESPONSE_TIME'].mean()
+
+avg_response_time_per_month = x.groupby('REQU_YEAR_MONTH')['RESPONSE_TIME'].mean()
+
+plt.figure(figsize=(10, 6))
+avg_response_time_per_year.plot(kind='line', marker='o', color='b', figsize=(12, 6))
+plt.title('Average Response Time per Year')
+plt.xlabel('Year')
+plt.ylabel('Average Response Time (days)')
+plt.grid(True)
+plt.tight_layout()
+
+output_path_month = "---"  # Modify with your desired path
+plt.savefig(output_path_month, dpi=300)
+
+plt.show()
+
+
+###
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+
+filtered_file2 = df
+
+rejected_df = filtered_file2[(filtered_file2['RESP_STATUS'] == 'Rejected') & (filtered_file2['REQU_YEAR'] == 2024)]
+
+rejection_counts = rejected_df['RESP_REJECTIONREASON'].value_counts()
+
+total_rejections = rejection_counts.sum()
+rejection_percentages = (rejection_counts / total_rejections) * 100
+
+gradient = plt.cm.Blues(np.linspace(0, 1, len(rejection_percentages)))
+
+sns.set(style="whitegrid")  # Sets a light background for a more modern look
+
+fig, ax = plt.subplots(figsize=(10, 8))
+
+wedges, texts, autotexts = ax.pie(rejection_percentages, autopct='%1.1f%%',
+                                  startangle=90, colors=gradient, wedgeprops={'edgecolor': 'white'}, labeldistance=1.3)
+
+for autotext in autotexts:
+    autotext.set_fontsize(12)
+    autotext.set_fontweight('bold')
+
+for text in texts:
+    text.set_fontsize(12)
+    text.set_fontweight('bold')
+
+ax.legend(wedges, rejection_percentages.index, title="Reden voor afwijzing", loc="center left", bbox_to_anchor=(1, 0, 0.5, 1),
+          fontsize=12, title_fontsize=14, frameon=False)
+
+ax.set_title('Redenen voor afwijzing per percentage (excl. 2024)', fontsize=16, fontweight='bold')
+
+ax.axis('equal')  # Equal aspect ratio ensures the pie chart is circular.
+
+plt.tight_layout()  # Ensures that the layout is tight and everything fits properly
+output_path = "---"
+plt.savefig(output_path, dpi=300)
+
+plt.show()
+
+
+
+### plotting the requests per month, showing difference over the years
+import pandas as pd
+import matplotlib.pyplot as plt
+
+filtered_file2['REQU_DATE'] = pd.to_datetime(filtered_file2['REQU_DATE'], errors='coerce')
+
+filtered_file2['Month'] = filtered_file2['REQU_DATE'].dt.month
+filtered_file2['Year'] = filtered_file2['REQU_DATE'].dt.year
+
+monthly_requests = filtered_file2.groupby(['Month', 'Year'])['REQU_NUMBER'].nunique().unstack(fill_value=0)
+
+ax = monthly_requests.plot(kind='bar', color = gradient, figsize=(12, 6), width=0.8)
+
+plt.xticks(ticks=range(12), labels=["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], rotation=45)
+
+plt.title('Aantal aanvragen per Maand, Geclusterd per Jaar')
+plt.xlabel('Maand')
+plt.ylabel('Aantal aanvragen')
+
+plt.grid(True, axis='y')
+
+plt.tight_layout()
+
+output_path = "---"
+plt.savefig(output_path, dpi=300)
+
+plt.show()
+
+
+### Plotting the overall average of monthly requests
+avg_monthly_request = avg_monthly_requests.mean()
+
+plt.figure(figsize=(10, 6))
+plt.plot(avg_monthly_requests.index, avg_monthly_requests, marker='o', color='lightblue', label='Gemiddeld Maandelijkse Aanvragen')
+plt.axhline(y=avg_monthly_request, color='red', linestyle='--', label=f'Gemiddeld ({avg_monthly_request:.2f})')
+
+plt.title('Gemiddeld aantal aanvragen per maand over 2020-2024')
+plt.xlabel('Maand')
+plt.ylabel('Gemiddeld aantal aanvragen')
+plt.xticks(range(1, 13), ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'])
+plt.grid(True)
+plt.tight_layout()
+plt.legend()
+
+output_path = "---"
+plt.savefig(output_path, dpi=300)
+
+plt.show()
+
+
+### plotting the requests per salary schale 
+merged_file = pd.merge(filtered_file2, filex, on="REQU_NUMBER", how='inner')
+merged_file['Schaal'] = pd.to_numeric(merged_file['Schaal'], errors='coerce')
+
+schaal_counts = merged_file['Schaal'].value_counts().sort_index()
+plt.figure(figsize=(10, 6))
+plt.bar(schaal_counts.index, schaal_counts.values, color='lightblue', width=1)
+
+plt.title('Distributie van Schalen')
+plt.xlabel('Schaal')
+plt.ylabel('Frequentie')
+
+plt.xticks(ticks=schaal_counts.index, labels=schaal_counts.index)
+
+output_path = "---"
+plt.savefig(output_path, dpi=300)
+
+plt.show()
+
+
+### plotting the change in the number of questions per domain over the years using an stacked area plot 
+
+import pandas as pd
+import re
+
+
+file = df_filtered
+
+def extract_role_info(role_name):
+    title = re.match(r"([A-Za-z\s]+)", role_name).group(0).strip()
+
+    # Explicit case for 'Analist Know Your Client' to set domain as KYC
+    if "Know Your Client" in title:
+        domain = "KYC"
+    # Explicit case for 'Compliance' to set domain as Compliance
+    elif "Compliance" in title:
+        domain = "Compliance"
+    elif "Risk" in title:
+        domain = "Credit Risk"
+    else:
+        domain = re.search(r"\((.*?)\)", role_name)
+        domain = domain.group(1) if domain else None
+        
+    level = re.search(r"(IV|V|I{1,})", role_name)
+    #level = re.search(r"(I{1,}|IV|V)", role_name)
+    level = level.group(0) if level else None
+    return title, level, domain
+
+df_filtered[['Title', 'Level', 'Domain']] = df_filtered['REQU_ROLENAME'].apply(lambda x: pd.Series(extract_role_info(x)))
+
+
+df2 = df_filtered.drop_duplicates(subset="REQU_NUMBER")
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Group by Year and Domain
+yearly_domain = df2.groupby(['REQU_YEAR', 'Domain']).size().unstack()
+
+ax = yearly_domain.plot.area(figsize=(28, 14), title="Domain Trends over de jaren", colormap='Blues')
+plt.xlabel("Jaar")
+plt.ylabel("Aantal")
+
+ax.set_xticks(yearly_domain.index)  # Set x-ticks to the year index
+ax.set_xticklabels(yearly_domain.index.astype(int))  
+
+colormap = plt.cm.Blues  #
+num_colors = len(yearly_domain.columns)
+colors = [colormap(i / num_colors) for i in range(num_colors)]  
+
+cumulative = yearly_domain.cumsum(axis=1)
+
+for i, (domain, color) in enumerate(zip(yearly_domain.columns, colors)):
+    non_zero_years = yearly_domain[domain] > 0
+    last_non_zero_year = non_zero_years[non_zero_years].index[-1]  # Last year with non-zero value
+
+    y_position = cumulative[domain].loc[last_non_zero_year]  # This gives the height where the domain ends
+
+    if np.isfinite(y_position):  # Ensure it's a valid finite position
+        ax.text(
+            x=last_non_zero_year,  # X-position: Last year with a non-zero value
+            y=y_position,         # Y-position: Height where the domain area ends
+            s=domain,             # Domain name as the label
+            color='black',         # Set text color to gray
+            fontsize=10,
+            ha='left',            # Place the text to the right of the graph
+            va='center',          # Vertically centered with the area
+        )
+
+ax.get_legend().remove()
+
+output_path = "---"
+plt.savefig(output_path, dpi=1500, transparent=False, bbox_inches='tight', format ='jpg')
+
+
+plt.show()
+
+
+
+
+
+
